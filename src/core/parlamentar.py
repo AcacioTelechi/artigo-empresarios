@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
+
 # from typing import Self
 from enum import auto
 
@@ -21,31 +22,32 @@ class Parlamentar:
         if isinstance(self.id_parl, int):
             self.id_parl = str(int(self.id_parl))
 
+
 @dataclass
 class ParlamentarDetalhes:
     "Representation of a parlamentar details."
-    id_parl: str 
-    nome: str 
-    nome_civil: str 
-    cpf: str 
-    sexo: str 
-    data_nascimento: datetime 
-    data_falecimento: datetime 
-    uf_nascimento: str 
-    municipio_nascimento: str 
-    escolaridade: str 
-    id_partido: str 
-    sigla_partido: str 
-    sigla_uf: str 
-    praca: str 
-    website: str 
-    facebook: str 
-    instagram: str 
-    twitter: str 
-    url_foto: str 
-    condicao_eleitoral: str 
+    id_parl: str
+    nome: str
+    nome_civil: str
+    cpf: str
+    sexo: str
+    data_nascimento: datetime
+    data_falecimento: datetime
+    uf_nascimento: str
+    municipio_nascimento: str
+    escolaridade: str
+    id_partido: str
+    sigla_partido: str
+    sigla_uf: str
+    praca: str
+    website: str
+    facebook: str
+    instagram: str
+    twitter: str
+    url_foto: str
+    condicao_eleitoral: str
     is_active: bool
-    situacao: str 
+    situacao: str
     gabinete: str
     email: str
 
@@ -53,7 +55,7 @@ class ParlamentarDetalhes:
         if isinstance(self.gabinete, str):
             gd = json.loads(self.gabinete)
             for k, v in gd.items():
-                if v == 'None':
+                if v == "None":
                     gd[k] = None
             self.gabinete = gd
 
@@ -66,6 +68,7 @@ class ParlamentarDetalhes:
                 diff.append(k)
         return diff
 
+
 @dataclass
 class Discurso:
     "Representation of a speech."
@@ -73,22 +76,24 @@ class Discurso:
     data_hora_inicio: datetime
     sigla_tipo_discurso: str
     tipo_descricao: str
-    keywords: str 
-    sumario: str 
-    tipo: str 
-    data_hora_fim: str = None
-    transcricao: str = None
-    url_evento: str = None
-    url_audio: str = None
-    url_texto: str = None
-    url_video: str = None
-    praca: str = None
-    id: int = None
-    related_proj_name: str = None
+    keywords: str
+    sumario: str
+    tipo: str
+    data_hora_fim: str | None = None
+    transcricao: str | None = None
+    url_evento: str | None = None
+    url_audio: str | None = None
+    url_texto: str | None = None
+    url_video: str | None = None
+    praca: str | None = None
+    id: int | None = None
+    related_proj_name: str | None = None
 
     def __post_init__(self):
         if isinstance(self.data_hora_inicio, str):
-            self.data_hora_inicio = datetime.strptime(self.data_hora_inicio, '%Y-%m-%dT%H:%M:%S')
+            self.data_hora_inicio = datetime.strptime(
+                self.data_hora_inicio, "%Y-%m-%dT%H:%M:%S"
+            )
 
 
 @dataclass
@@ -108,6 +113,7 @@ class Reputacao:
     cod_perfil: int
     ano: int
 
+
 @dataclass
 class Lideranca:
     id_parl: str
@@ -121,6 +127,7 @@ class Lideranca:
     data_fim: datetime
     peso: int
     is_active: bool
+
 
 @dataclass
 class Profissao:
@@ -136,4 +143,4 @@ class ParlamentarProfissao:
     titulo: str
     cod_tipo_profissao: str
     praca: str
-    data_hora: str = field(default_factory=datetime.now)
+    data_hora: str = field(default_factory=datetime.now)  # type: ignore

@@ -1,63 +1,26 @@
 import os
+from typing import List
 from datetime import datetime
-from time import sleep
 
 import pandas as pd
-import requests
 from tqdm import tqdm
 
-from .core.config import Config, get_data
-from .core.proposicao import (
+from .core import (
     ArvoreApensados,
+    Config,
     Node,
+    Parlamentar,
+    ParlamentarProfissao,
     Proposicao,
     ProposicaoAutor,
     ProposicaoDetalhes,
+    Votacao,
+    Voto,
+    get_data,
 )
-from .core.parlamentar import Parlamentar, ParlamentarDetalhes, ParlamentarProfissao
-from .core.votacao import Votacao, Voto
-from .core.config import Config, get_data
 
 
-def request(url) -> list[dict]:
-    arqv = []
-    flag = True
-    while flag:
-        try:
-            response = requests.get(url)
-        except TimeoutError:
-            print("Timeout: sleeping for 60 secs")
-            sleep(60)
-            continue
-        except requests.exceptions.ConnectTimeout:
-            print("Timeout: sleeping for 60 secs")
-            sleep(60)
-            continue
-        except requests.exceptions.Timeout:
-            print("Timeout: sleeping for 60 secs")
-            sleep(60)
-            continue
-        except requests.exceptions.ConnectionError:
-            print("ConnectionError: sleeping for 60 secs")
-            sleep(60)
-            continue
-        if response.status_code == 200:
-            resp = response.json()
-            if isinstance(resp["dados"], list):
-                arqv += resp["dados"]
-            else:
-                arqv.append(resp["dados"])
-            rels = [link["rel"] for link in resp["links"]]
-            if "next" in rels:
-                url = resp["links"][rels.index("next")]["href"]
-            else:
-                flag = False
-        else:
-            raise ConnectionError(response.status_code)
-    return arqv
-
-
-def parlamentares(
+def get_parlamentares(
     parameters: dict = {"dataInicio": "2018-01-01", "dataFim": "2023-01-01"}
 ):
     config = Config(
@@ -80,7 +43,7 @@ def parlamentares(
     return parls
 
 
-def profissoes(parlamentares: list[Parlamentar]) -> [ParlamentarProfissao]:
+def get_profissoes(parlamentares: List[Parlamentar]) -> List[ParlamentarProfissao]:
     final = []
     for parl in tqdm(parlamentares, "Detalhes dos Parlamentares"):
         config_prof = Config(
@@ -100,7 +63,7 @@ def profissoes(parlamentares: list[Parlamentar]) -> [ParlamentarProfissao]:
     return final
 
 
-def arvore_apensados(list_props: list[Proposicao]) -> ArvoreApensados:
+def get_arvore_apensados(list_props: List[Proposicao]) -> ArvoreApensados:
     def find_related_projs(prop: Proposicao):
         config = Config(endpoint=f"proposicoes/{prop.id_prop}/relacionadas")
         resp = get_data(config.url)
@@ -108,7 +71,7 @@ def arvore_apensados(list_props: list[Proposicao]) -> ArvoreApensados:
         proposicoes_relacionadas = []
         for item in resp:
             url_detalhes = item["uri"]
-            detalhes = request(url_detalhes)[0]
+            detalhes = get_data(url_detalhes)[0]
             proposicoes_relacionadas.append(
                 Proposicao(
                     id_prop=str(detalhes["id"]),
@@ -141,32 +104,35 @@ def arvore_apensados(list_props: list[Proposicao]) -> ArvoreApensados:
             final.append(node)
         return final
 
-    pbar = tqdm(list_props, desc="Árvore de Apensados")
+    pbar = tqdm(list_props, desc="Árvore de Apensados\t")
     arvore = montar_arvore(list_props, pbar)
     pbar.close()
     return ArvoreApensados(arvore)
 
 
-def find_projects_by_name(proposicoes: list[Proposicao]) -> list[Proposicao]:
+def get_projects_by_name(proposicoes: List[Proposicao]) -> List[Proposicao]:
     "Find projects by name."
     # encontrar ids dos projetos
     for proposicao in proposicoes:
-        sigla_tipo = proposicao.sigla_tipo
-        numero = proposicao.numero
-        ano = proposicao.ano
         config = Config(
             endpoint="proposicoes",
-            parameters={"siglaTipo": sigla_tipo, "numero": numero, "ano": ano},
+            parameters={
+                "siglaTipo": proposicao.sigla_tipo,
+                "numero": proposicao.numero,
+                "ano": proposicao.ano,
+            },
         )
         data = get_data(config.url)
         if len(data) > 0:
             proposicao.id_prop = str(data[0]["id"])
         else:
-            print(f"{sigla_tipo} {numero}/{ano} não encontrado\n URL: {config.url}")
+            print(
+                f"{proposicao.sigla_tipo} {proposicao.numero}/{proposicao.ano} não encontrado\n URL: {config.url}"
+            )
     return proposicoes
 
 
-def autores(list_projs: list[Proposicao]) -> list[ProposicaoAutor]:
+def get_autores(list_projs: List[Proposicao]) -> List[ProposicaoAutor]:
     # pegar autores
     autores_relacionadas = []
     for proj in tqdm(list_projs, desc="Autores"):
@@ -187,7 +153,7 @@ def autores(list_projs: list[Proposicao]) -> list[ProposicaoAutor]:
     return autores_relacionadas
 
 
-def proposicoes_detalhes(
+def get_proposicoes_detalhes(
     proposicoes: list[Proposicao],
 ) -> list[ProposicaoDetalhes]:
     objs = []
@@ -223,7 +189,7 @@ def proposicoes_detalhes(
             url=resp["statusProposicao"]["url"],
             status_ambito=resp["statusProposicao"]["ambito"],
             status_apreciacao=resp["statusProposicao"]["apreciacao"],
-            is_tramit=None,
+            is_tramit=None,  # type: ignore
             status_id_org=resp["statusProposicao"]["uriOrgao"].split("/")[-1],
         )
 
@@ -232,13 +198,13 @@ def proposicoes_detalhes(
     return objs
 
 
-def votacoes(list_props: list[Proposicao]) -> list[Votacao]:
+def get_votacoes(list_props: List[Proposicao]) -> List[Votacao]:
     """get votacoes por proposicao"""
     votacoes = []
     id_proposicoes_com_votacoes = []
-    for prop in tqdm(list_props, desc="Votacoes"):
-        url = f"https://dadosabertos.camara.leg.br/api/v2/proposicoes/{prop.id_prop}/votacoes?ordem=DESC&ordenarPor=dataHoraRegistro"
-        resp = request(url)
+    for prop in tqdm(list_props, desc="Votações"):
+        config = Config(endpoint=f"proposicoes/{prop.id_prop}/votacoes")
+        resp = get_data(config.url)
         if len(resp) == 0:
             continue
         id_proposicoes_com_votacoes.append(prop.id_prop)
@@ -256,8 +222,8 @@ def votacoes(list_props: list[Proposicao]) -> list[Votacao]:
             )
     # get detalhes das votações
     for votacao in tqdm(votacoes, desc="Detalhes Votações"):
-        url = f"https://dadosabertos.camara.leg.br/api/v2/votacoes/{votacao.id_votacao}"
-        resp = request(url)[0]
+        config = Config(endpoint=f"votacoes/{votacao.id_votacao}")
+        resp = get_data(config.url)[0]
         votacao.uriProposicaoCitada = resp["ultimaApresentacaoProposicao"][
             "uriProposicaoCitada"
         ]
@@ -270,12 +236,12 @@ def votacoes(list_props: list[Proposicao]) -> list[Votacao]:
     return votacoes
 
 
-def votos(votacoes: [Votacao]):
+def get_votos(votacoes: List[Votacao]):
     id_votacoes_com_votos = []
     votos = []
     for votacao in tqdm(votacoes, "Votacoes analisadas"):
-        url = f"https://dadosabertos.camara.leg.br/api/v2/votacoes/{votacao.id_votacao}/votos"
-        resp = request(url)
+        config = Config(endpoint=f"votacoes/{votacao.id_votacao}/votos")
+        resp = get_data(config.url)
         if len(resp) == 0:
             continue
         for vot in resp:
@@ -294,31 +260,31 @@ def votos(votacoes: [Votacao]):
 
 
 def main():
-    parls = parlamentares()
-    profs = profissoes(parls)
+    # parls = get_parlamentares()
+    # profs = get_profissoes(parls)
 
-    pd.DataFrame(parls).to_csv("./data/parlamentares.csv")
-    pd.DataFrame(profs).to_csv("./data/profissoes.csv")
-    
+    # pd.DataFrame(parls).to_csv("./data/parlamentares.csv", index=False)
+    # pd.DataFrame(profs).to_csv("./data/profissoes.csv", index=False)
+
     projs = pd.read_excel(r"./projetos_selecionados.xlsx")
     for idx in projs.index:
         prop = Proposicao(
-            sigla_tipo=projs.loc[idx, "tipo"],
-            numero=projs.loc[idx, "código"],
-            ano=projs.loc[idx, "ano "],
+            sigla_tipo=projs.loc[idx, "tipo"],  # type: ignore
+            numero=projs.loc[idx, "código"],  # type: ignore
+            ano=projs.loc[idx, "ano "],  # type: ignore
         )
 
-        resp = find_projects_by_name([prop])
+        resp = get_projects_by_name([prop])
 
-        arvore = arvore_apensados(resp)
+        arvore = get_arvore_apensados(resp)
 
-        autores = autores(arvore.nodes)
+        autores = get_autores(arvore.nodes)
 
-        props_detalhes = proposicoes_detalhes(arvore.nodes)
+        props_detalhes = get_proposicoes_detalhes(arvore.nodes)
 
-        votacoes = votacoes(arvore.nodes)
+        votacoes = get_votacoes(arvore.nodes)
 
-        votos = votos(votacoes)
+        votos = get_votos(votacoes)
 
         nome_tema = projs.loc[idx, "tema "]
 
@@ -328,7 +294,11 @@ def main():
         except FileExistsError:
             pass
 
-        pd.DataFrame(props_detalhes).to_csv(path + "/projetos.csv")
-        pd.DataFrame(autores).to_csv(path + "/autores.csv")
-        pd.DataFrame(votacoes).to_csv(path + "/votacoes.csv")
-        pd.DataFrame(votos).to_csv(path + "/votos.csv")
+        pd.DataFrame(props_detalhes).to_csv(path + "/projetos.csv", index=False)
+        pd.DataFrame(autores).to_csv(path + "/autores.csv", index=False)
+        pd.DataFrame(votacoes).to_csv(path + "/votacoes.csv", index=False)
+        pd.DataFrame(votos).to_csv(path + "/votos.csv", index=False)
+
+
+if __name__ == "__main__":
+    main()

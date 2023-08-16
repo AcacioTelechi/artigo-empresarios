@@ -48,7 +48,7 @@ def add_url_params(url:str, params: dict) -> str:
     return new_url
 
 def add_url_path(url:str, path: dict) -> str:
-    return urljoin(url, path)
+    return urljoin(url, path) # type: ignore
 
 
 def trat_str(string: str) -> str:
@@ -62,16 +62,10 @@ def trat_tit_eleitoral(tit) -> str:
     tit_str = str(tit)
     return tit_str.rjust(12, '0')
 
-def infinite_date_generator(date: datetime):
+def infinite_date_generator(date: datetime.datetime):
     while True:
         yield date
         date += datetime.timedelta(1)
-
-def infinite_date_generator(date: datetime):
-    while True:
-        yield date
-        date += datetime.timedelta(1)
-
 
 def transform_datetime_format(datetime_string: str) -> datetime.datetime:
     formats = [
