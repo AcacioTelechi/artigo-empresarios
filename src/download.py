@@ -16,6 +16,7 @@ from .core import (
     ProposicaoDetalhes,
     Votacao,
     Voto,
+    OrientacaoVoto,
     get_data,
 )
 
@@ -258,6 +259,24 @@ def get_votos(votacoes: List[Votacao]):
     print(f"{len(votos)} votos em {len(id_votacoes_com_votos)} votações.")
     return votos
 
+def get_orientacoes(votacoes: List[Votacao]):
+    orientacoes = []
+    for votacao in tqdm(votacoes, "Buscando Orientações"):
+        config = Config(endpoint=f"votacoes/{votacao.id_votacao}/orientacoes")
+        resp = get_data(config.url)
+        if len(resp) == 0:
+            continue
+        for ori in resp:
+            orientacoes.append(
+                OrientacaoVoto(
+                    cod_partido_bloco=ori['codPartidoBloco'],
+                    cod_tipo_lideranca=ori['codTipoLideranca'],
+                    orientacao_voto=ori['orientacaoVoto'],
+                    sigla_partido_bloco=ori['siglaPartidoBloco'],
+                    id_votacao=votacao.id_votacao,
+                )
+            )
+    return orientacoes
 
 def main():
     # parls = get_parlamentares()

@@ -36,10 +36,7 @@ class Voto:
 
     def __post_init__(self):
         if not self.voto_trat:
-            if self.voto in VOTOS_DE_PARA.keys():
-                self.voto_trat = VOTOS_DE_PARA[self.voto]
-            else:
-                self.voto_trat = 0
+            self.voto_trat = VOTOS_DE_PARA.get(self.voto, 0)
 
 
 @dataclass
@@ -52,10 +49,7 @@ class OrientacaoVoto:
     id_votacao: str
 
     def __post_init__(self):
-        if self.orientacao_voto in VOTOS_DE_PARA.keys():
-            self.voto_trat = VOTOS_DE_PARA[self.orientacao_voto]
-        else:
-            self.voto_trat = 0
+        self.voto_trat = VOTOS_DE_PARA.get(self.orientacao_voto, 0)
 
 
 class TipoVoto(Enum):
